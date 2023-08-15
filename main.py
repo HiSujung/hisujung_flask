@@ -1,18 +1,46 @@
-
+# -*- coding: utf-8 -*-
+import numpy as np
 import pandas as pd
+from numpy import dot
+from numpy.linalg import norm
+from transformers import T5Config
+from sentence_transformers import SentenceTransformer
+from flask import Flask, request, jsonify
 import matplotlib.pyplot as plt
 from gensim.models import FastText
 from konlpy.tag import Okt
 from sklearn.metrics.pairwise import cosine_similarity
 import requests
 import gensim
-from flask import Flask, request, jsonify
 import urllib.request
 import pymysql
 import csv
-from flasgger import Swagger
 
 app = Flask(__name__)
+
+
+# 챗봇 데이터 가져오기
+# urllib.request.urlretrieve("https://raw.githubusercontent.com/songys/Chatbot_data/master/ChatbotData.csv", filename="ChatBotData.csv")
+train_data = pd.read_csv('hisujungChatbot.csv')
+train_data.dropna(subset=['Q', 'A'], inplace=True)
+
+model = SentenceTransformer('sentence-transformers/xlm-r-100langs-bert-base-nli-stsb-mean-tokens')
+
+train_data['embedding'] = train_data.apply(lambda row: model.encode(row.Q), axis=1)
+
+def cos_sim(A, B):
+    return dot(A, B)/(norm(A)*norm(B))
+
+def return_answer(question):
+    embedding = model.encode(question)
+    train_data['score'] = train_data.apply(lambda x: cos_sim(x['embedding'], embedding), axis=1)
+    return train_data.loc[train_data['score'].idxmax()]['A']
+
+@app.route('/getanswer', methods=['GET'])
+def get_answer():
+    question = request.args.get('question',type=str,default='')
+    answer = return_answer(question)
+    return jsonify({"answer": answer})
 
 
 
@@ -96,56 +124,59 @@ def reccomendations(filename, univ_activity_id):
 
 @app.route("/recommend/univ", methods=['GET'])
 def univAct():
-    act = request.args.get('activity_name', type=int, default='')
-    recommend_df = reccomendations("univ.csv", act)  # Assuming 'recommend' is the result of the recommendations
+        act = request.args.get('activity_name', type=int, default='')
+        recommend_df = reccomendations("univ.csv", act)  # Assuming 'recommend' is the result of the recommendations
 
-    # Extract the titles from the recommendation dataframe
-    recommend_titles = recommend_df['title'].tolist()
+        # Extract the titles from the recommendation dataframe
+        recommend_titles = recommend_df['title'].tolist()
 
-    # Create placeholders for the SQL query
-    placeholders = ', '.join(['%s'] * len(recommend_titles))
+        # Create placeholders for the SQL query
+        placeholders = ', '.join(['%s'] * len(recommend_titles))
 
-    # SQL query to fetch information based on titles
-    sql = f"SELECT univ_activity_id, title, link FROM UnivActivity WHERE title IN ({placeholders});"
+        # SQL query to fetch information based on titles
+        sql = "SELECT univ_activity_id, title, link FROM UnivActivity WHERE tite IN ({});".format(placeholders)
 
-    conn = pymysql.connect(host='hisujung-db.cuidqegkqifp.ap-northeast-2.rds.amazonaws.com', port=3306, user='admin', passwd='hisujung', db='hisujungDB', charset='utf8')
-    
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(sql, recommend_titles)
-            result = cursor.fetchall()
-    finally:
-        conn.close()
-        # Create a dataframe from the SQL query result
-    result_df = pd.DataFrame(result, columns=['univ_activity_id', 'title', 'link'])
-    return jsonify({'reccomend': result_df.to_dict(orient='records')})
+        conn = pymysql.connect(host='hisujung-db.cuidqegkqifp.ap-northeast-2.rds.amazonaws.com', port=3306, user='admin', passwd='hisujung', db='hisujungDB', charset='utf8')
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, recommend_titles)
+                result = cursor.fetchall()
+        finally:
+            conn.close()
+            # Create a dataframe from the SQL query result
+        result_df = pd.DataFrame(result, columns=['univ_activity_id', 'title', 'link'])
+        return jsonify({'reccomend': result_df.to_dict(orient='records')})
     
 @app.route("/recommend/external", methods=['GET'])
 def externalAct():
-    act = request.args.get('activity_name', type=int, default='')
-    recommend_df = reccomendations("contest.csv", act)  # Assuming 'recommend' is the result of the recommendations
+        act = request.args.get('activity_name', type=int, default='')
+        recommend_df = reccomendations("contest.csv", act)  # Assuming 'recommend' is the result of the recommendations
 
-    # Extract the titles from the recommendation dataframe
-    recommend_titles = recommend_df['title'].tolist()
+        # Extract the titles from the recommendation dataframe
+        recommend_titles = recommend_df['title'].tolist()
 
-    # Create placeholders for the SQL query
-    placeholders = ', '.join(['%s'] * len(recommend_titles))
+        # Create placeholders for the SQL query
+        placeholders = ', '.join(['%s'] * len(recommend_titles))
 
-    # SQL query to fetch information based on titles
-    sql = f"SELECT external_act_id, title, link FROM ExternalAct WHERE title IN ({placeholders});"
+        # SQL query to fetch information based on titles
+        sql = "SELECT external_act_id, title, link FROM ExternalAct WHERE title IN ({});".format(placeholders)
 
-    conn = pymysql.connect(host='hisujung-db.cuidqegkqifp.ap-northeast-2.rds.amazonaws.com', port=3306, user='admin', passwd='hisujung', db='hisujungDB', charset='utf8')
-    
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute(sql, recommend_titles)
-            result = cursor.fetchall()
-    finally:
-        conn.close()
-        # Create a dataframe from the SQL query result
-    result_df = pd.DataFrame(result, columns=['external_act_id', 'title', 'link'])
+        conn = pymysql.connect(host='hisujung-db.cuidqegkqifp.ap-northeast-2.rds.amazonaws.com', port=3306, user='admin', passwd='hisujung', db='hisujungDB', charset='utf8')
+        
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, recommend_titles)
+                result = cursor.fetchall()
+        finally:
+            conn.close()
+            # Create a dataframe from the SQL query result
+        result_df = pd.DataFrame(result, columns=['external_act_id', 'title', 'link'])
 
-    return jsonify({'reccomend': result_df.to_dict(orient='records')})
+        return jsonify({'reccomend': result_df.to_dict(orient='records')})
 
 if __name__ == '__main__':
     app.run(debug=True,host="0.0.0.0",port=5000)
+
+
+
