@@ -36,7 +36,7 @@ def return_answer(question):
     train_data['score'] = train_data.apply(lambda x: cos_sim(x['embedding'], embedding), axis=1)
     return train_data.loc[train_data['score'].idxmax()]['A']
 
-@app.route('/getanswer', methods=['GET'])
+@app.route('/chatbot/getanswer', methods=['GET'])
 def get_answer():
     question = request.args.get('question',type=str,default='')
     answer = return_answer(question)
@@ -59,7 +59,7 @@ try:
         csv_writer.writerow([i[0] for i in cursor.description])  # Write column headers
         csv_writer.writerows(result)  # Write data rows
 
-    print("Data exported to contest.csv successfully.")
+    #print("Data exported to contest.csv successfully.")
 except Exception as e:
     print("Error:", e)
 finally:
@@ -80,7 +80,7 @@ try:
         csv_writer.writerow([i[0] for i in cursor2.description])  # Write column headers
         csv_writer.writerows(result2)  # Write data rows
 
-    print("Data exported to univ.csv successfully.")
+    #print("Data exported to univ.csv successfully.")
 except Exception as e:
     print("Error:", e)
 finally:
@@ -176,7 +176,7 @@ def externalAct():
         return jsonify({'reccomend': result_df.to_dict(orient='records')})
 
 if __name__ == '__main__':
-    app.run(debug=True,host="0.0.0.0",port=5000)
+    app.run(debug=True, use_reloader=False,host="0.0.0.0",port=5000)
 
 
 
