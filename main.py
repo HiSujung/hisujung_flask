@@ -134,7 +134,7 @@ def univAct():
         placeholders = ', '.join(['%s'] * len(recommend_titles))
 
         # SQL query to fetch information based on titles
-        sql = "SELECT univ_activity_id, title, link FROM UnivActivity WHERE tite IN ({});".format(placeholders)
+        sql = "SELECT univ_activity_id, title, link FROM UnivActivity WHERE title IN ({});".format(placeholders)
 
         conn = pymysql.connect(host='hisujung-db.cuidqegkqifp.ap-northeast-2.rds.amazonaws.com', port=3306, user='admin', passwd='hisujung', db='hisujungDB', charset='utf8')
         
